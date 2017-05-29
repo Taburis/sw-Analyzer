@@ -32,8 +32,21 @@ process.source = cms.Source("PoolSource",
 
 
 process.demo = cms.EDAnalyzer('simHitsAnalyzer',
+	allowDifferentSimHitProcesses = cms.bool(True),
         tpHitsSrc = cms.InputTag('mix', 'MergedTrackTruth'),
-        hitSrc = cms.InputTag('g4SimHits', 'TrackerHitsPixelBarrelHighTof')
+        hitHighTofSrc = cms.InputTag('g4SimHits', 'TrackerHitsPixelBarrelHighTof'),
+        hitLowTofSrc = cms.InputTag('g4SimHits', 'TrackerHitsPixelBarrelLowTof'),
+        hitEndHighTofSrc = cms.InputTag('g4SimHits', 'TrackerHitsPixelEndcapHighTof'),
+        hitEndLowTofSrc = cms.InputTag('g4SimHits',  'TrackerHitsPixelEndcapLowTof'),
+        hitTECHighTofSrc = cms.InputTag('g4SimHits', 'TrackerHitsTECHighTof'),
+        hitTECLowTofSrc = cms.InputTag('g4SimHits',  'TrackerHitsTECLowTof'),
+        hitTIBHighTofSrc = cms.InputTag('g4SimHits', 'TrackerHitsTIBHighTof'),
+        hitTIBLowTofSrc = cms.InputTag('g4SimHits',  'TrackerHitsTIBLowTof'),
+        hitTIDHighTofSrc = cms.InputTag('g4SimHits', 'TrackerHitsTIDHighTof'),
+        hitTIDLowTofSrc = cms.InputTag('g4SimHits',  'TrackerHitsTIDLowTof'),
+        hitTOBHighTofSrc = cms.InputTag('g4SimHits', 'TrackerHitsTOBHighTof'),
+        hitTOBLowTofSrc = cms.InputTag('g4SimHits',  'TrackerHitsTOBLowTof'),
+        simTrackSrc = cms.InputTag('g4SimHits', ''),
 )
 
 process.p = cms.Path(
