@@ -16,6 +16,8 @@
 #include "Geometry/Records/interface/TrackerDigiGeometryRecord.h" 
 #include "Geometry/CommonDetUnit/interface/GeomDetUnit.h" 
 #include "Geometry/TrackerGeometryBuilder/interface/TrackerGeometry.h" 
+#include "DataFormats/TrackerCommon/interface/TrackerTopology.h"
+#include "Geometry/Records/interface/TrackerTopologyRcd.h"
 #include "SimDataFormats/Track/interface/SimTrackContainer.h"
 #include "SimDataFormats/TrackingAnalysis/interface/TrackingParticle.h"
 #include "SimDataFormats/TrackingAnalysis/interface/TrackingParticleFwd.h"
@@ -27,7 +29,7 @@
 
 
 #include <TH1.h>
-#include <TH3F.h>
+#include <TH2F.h>
 #include <TNtuple.h>
 
 
@@ -75,7 +77,7 @@ class simHitsAnalyzer : public edm::EDAnalyzer{
 		TH1I *h_hits_2;
 		TH1I *h_hits_3;
 		TH1F *hpt;
-		TH3F *hdist;
+		TH2F *hdist;
 		TNtuple* tnp;
 		std::string SimHitLabel;
 };
@@ -102,7 +104,7 @@ simHitsAnalyzer::simHitsAnalyzer(const edm::ParameterSet& iConfig):
 	h_hits_2 = fs->make<TH1I>("h_hits_2","Sim Hits",10, -0.5, 9.5);
 	h_hits_3 = fs->make<TH1I>("h_hits_3","Sim Hits",10, -0.5, 9.5);
 	hpt = fs->make<TH1F>("hpt","tp pT",200, 0,50);
-	hdist = fs->make<TH3F>("hdist","Hits",100, -500. , 500., 100,-500,500, 100, -500,500 );
+	hdist = fs->make<TH2F>("hdist","Hits",100, -1. , 1, 100,-3,3);
 	tnp = fs->make<TNtuple>("tnp","hits_tnp","x:y:z" );
 }
 
@@ -118,10 +120,14 @@ void simHitsAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSetup& i
 
 	using namespace edm;
 
-	edm::ESHandle<TrackerGeometry> tGeo;
+	//edm::ESHandle<TrackerGeometry> tGeo;
 	//iSetup.get<TrackerDigiGeometryRecord>().get(tGeo);
+	//geo_ = tGeo.product();
 	//
-	geo_ = tGeo.product();
+	edm::ESHandle<TrackerTopology> tTopoHandle;
+	iSetup.get<TrackerTopologyRcd>().get(tTopoHandle);
+	const TrackerTopology* const tTopo = tTopoHandle.product();
+	//
 	//iSetup.getData(pdt);
 	//
 	edm::Handle<TrackingParticleCollection> tpCollection;
@@ -138,6 +144,7 @@ void simHitsAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSetup& i
 	//edm::Handle<PSimHitContainer> SiTOBHitsHighTof;
 	//edm::Handle<PSimHitContainer> SiTOBHitsLowTof;
 	//	edm::Handle<SimTrackContainer> simTrackCollection;
+
 
 	iEvent.getByToken(tpHitsSrc_, tpCollection);
 	iEvent.getByToken(hitHighTofContainer_,PixelBarrelHitsHighTof);
@@ -169,9 +176,10 @@ void simHitsAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSetup& i
 	//simHits.insert(simHits.end(), SiTECHitsHighTof->begin(), SiTECHitsHighTof->end()); 
 	//simHits.insert(simHits.end(), SiTECHitsLowTof->begin(),  SiTECHitsLowTof->end()); 
 
-	//	std::vector<trkHit> track_hits ; 
-	std::multimap<unsigned int, size_t> trackId_hitsId; 
 	//build the PSimHits index
+	std::multimap<unsigned int, size_t> trackId_hitsId; 
+	std::vector<double> vx;
+	std::vector<double> vy;
 	for(size_t i =0;i<simHits.size();++i){
 		trackId_hitsId.insert( std::make_pair( (simHits.at(i)).trackId(),i) );
 	}
@@ -191,15 +199,15 @@ void simHitsAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSetup& i
 			const SimTrack & simTrack = simTrackVec.at(j);
 			if( simTrack.type()!= pdgId)continue;
 			//int pdgId = simTrack.type();
-			//	size_t matchedHits=0; // As far as I can tell, this is the number of tracker layers with hits on them, i.e. taking account of overlaps.
+			size_t matchedHits=0; // As far as I can tell, this is the number of tracker layers with hits on them, i.e. taking account of overlaps.
 			size_t numberOfHits=0; // The total number of hits not taking account of overlaps.
 			size_t numberOfTrackerHits=0;
 			bool init=true;
 			int processType=0;
 			//int particleType=0;
 			double tof =0;
-			//int oldLayer = 0;
-			//unsigned int newLayer = 0;
+			int oldLayer = 0;
+			int newLayer = 0;
 			DetId oldDetector;
 			DetId newDetector;
 
@@ -208,8 +216,8 @@ void simHitsAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSetup& i
 			for( auto iHitIndex=trackId_hitsId.lower_bound( simTrack.trackId() ), end=trackId_hitsId.upper_bound( simTrack.trackId() );
 					iHitIndex!=end;
 					++iHitIndex ){
-/*
-*/
+				/*
+				*/
 				const auto & pSimHit=simHits[ iHitIndex->second ];
 				if(pSimHit.particleType() != pdgId) continue;
 				if( init ) {
@@ -242,39 +250,50 @@ void simHitsAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSetup& i
 				if( processType==pSimHit.processType() )
 				{
 					++numberOfHits;
-					//		oldLayer=newLayer;
-					//		newLayer=0;
+					oldLayer=newLayer;
+					newLayer=0;
 					if( newDetector.det() == DetId::Tracker ) {
 						++numberOfTrackerHits;
 
-						//	newLayer=tTopo->layer( newDetector );
-						//	newLayer=layer( newDetector );
+						newLayer=tTopo->layer( newDetector );
+						//				newLayer=layer( newDetector );
 
-						//	// Count hits using layers for glued detectors
-						//	if( (oldLayer!=newLayer || (oldLayer==newLayer && oldDetector.subdetId()!=newDetector.subdetId())) ) ++matchedHits;
+						// Count hits using layers for glued detectors
+						if( (oldLayer!=newLayer || (oldLayer==newLayer && oldDetector.subdetId()!=newDetector.subdetId())) ) ++matchedHits;
 					}
 				}
+				vx.push_back((pSimHit.entryPoint()).x());
+				vy.push_back((pSimHit.entryPoint()).y());
 				tnp->Fill((pSimHit.entryPoint()).x(), (pSimHit.entryPoint()).y(),(pSimHit.entryPoint()).z());
 			}//end loop over PSimHit for this sim Track.
-			if(j==0) h_hits_1->Fill(numberOfHits); //1*
+			if(j==0) h_hits_1->Fill(matchedHits); 
+			//if(j==0) h_hits_1->Fill(numberOfHits); 
+			if(j==0 && TMath::Abs(tp->eta())<=1) h_hits_3->Fill(matchedHits);
+			if(numberOfHits >4) {
+				for(int i=0; i<int(vx.size());++i){
+					hdist->Fill(vx.at(i), vy.at(i));
+				}
+			}
+			vx.clear();
+			vy.clear();
 		}
 		//	h_hits_1->Fill(tp->numberOfHits());
 		h_hits_2->Fill(tp->numberOfTrackerHits());
 		hpt ->Fill(tp->pt());
 	}
-std::cout<<tpCollection->size()<<std::endl;
+	std::cout<<tpCollection->size()<<std::endl;
 }
 
 void simHitsAnalyzer::endJob(){
 }
 /*
-int simHitsAnalyzer::layer(DetId & id, bool isBarrel){
-	if(isBarrel) {
-		return int((id.rawId()>>pbVals_.layerStartBit_) & pbVals_.layerMask_);
-	}
-	else {
-		return int((id.rawId()>>pfVals_.diskStartBit_) & pfVals_.diskMask_);
-	}
-}
-*/
+   int simHitsAnalyzer::layer(DetId & id, bool isBarrel){
+   if(isBarrel) {
+   return int((id.rawId()>>pbVals_.layerStartBit_) & pbVals_.layerMask_);
+   }
+   else {
+   return int((id.rawId()>>pfVals_.diskStartBit_) & pfVals_.diskMask_);
+   }
+   }
+   */
 DEFINE_FWK_MODULE(simHitsAnalyzer);
