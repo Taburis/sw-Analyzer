@@ -30,6 +30,7 @@
 
 #include <TH1.h>
 #include <TH2F.h>
+#include <TH3F.h>
 #include <TNtuple.h>
 
 
@@ -73,11 +74,9 @@ class simHitsAnalyzer : public edm::EDAnalyzer{
 
 
 
-		TH1I *h_hits_1;
-		TH1I *h_hits_2;
-		TH1I *h_hits_3;
+		TH3F *h3_layerDistribution;
+		TH3F *h3_hitsDistribution;
 		TH1F *hpt;
-		TH2F *hdist;
 		TNtuple* tnp;
 		std::string SimHitLabel;
 };
@@ -100,11 +99,9 @@ simHitsAnalyzer::simHitsAnalyzer(const edm::ParameterSet& iConfig):
 	//simTrackContainer_(consumes<edm::SimTrackContainer>(iConfig.getParameter<edm::InputTag>("simTrackSrc")))
 {
 	edm::Service<TFileService> fs;
-	h_hits_1 = fs->make<TH1I>("h_hits_1","Sim Hits",10, -0.5, 9.5);
-	h_hits_2 = fs->make<TH1I>("h_hits_2","Sim Hits",10, -0.5, 9.5);
-	h_hits_3 = fs->make<TH1I>("h_hits_3","Sim Hits",10, -0.5, 9.5);
+	h3_layerDistribution = fs->make<TH3F>("h3_layerDistribution","number of layer distribution",10, -0.5, 9.5, 50,-3, 3,50, -3.1415926, 3.1415926);
+	h3_hitsDistribution = fs->make<TH3F>("h3_hitsDistribution","number of Hits distribution",10, -0.5, 9.5, 50,-3, 3,50, -3.1415926, 3.1415926);
 	hpt = fs->make<TH1F>("hpt","tp pT",200, 0,50);
-	hdist = fs->make<TH2F>("hdist","Hits",100, -1. , 1, 100,-3,3);
 	tnp = fs->make<TNtuple>("tnp","hits_tnp","x:y:z" );
 }
 
@@ -165,8 +162,8 @@ void simHitsAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSetup& i
 	std::vector<PSimHit> simHits;
 	simHits.insert(simHits.end(), PixelBarrelHitsHighTof->begin(), PixelBarrelHitsHighTof->end()); 
 	simHits.insert(simHits.end(), PixelBarrelHitsLowTof->begin(),  PixelBarrelHitsLowTof->end()); 
-	simHits.insert(simHits.end(), PixelEndcapHitsHighTof->begin(), PixelEndcapHitsHighTof->end()); 
-	simHits.insert(simHits.end(), PixelEndcapHitsLowTof->begin(),  PixelEndcapHitsLowTof->end()); 
+	//simHits.insert(simHits.end(), PixelEndcapHitsHighTof->begin(), PixelEndcapHitsHighTof->end()); 
+	//simHits.insert(simHits.end(), PixelEndcapHitsLowTof->begin(),  PixelEndcapHitsLowTof->end()); 
 	//simHits.insert(simHits.end(), SiTIBHitsHighTof->begin(), SiTIBHitsHighTof->end()); 
 	//simHits.insert(simHits.end(), SiTIBHitsLowTof->begin(),  SiTIBHitsLowTof->end()); 
 	//simHits.insert(simHits.end(), SiTOBHitsHighTof->begin(), SiTOBHitsHighTof->end()); 
@@ -262,23 +259,13 @@ void simHitsAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSetup& i
 						if( (oldLayer!=newLayer || (oldLayer==newLayer && oldDetector.subdetId()!=newDetector.subdetId())) ) ++matchedHits;
 					}
 				}
-				vx.push_back((pSimHit.entryPoint()).x());
-				vy.push_back((pSimHit.entryPoint()).y());
+				//the local coordinate of the hits on the pixel:
 				tnp->Fill((pSimHit.entryPoint()).x(), (pSimHit.entryPoint()).y(),(pSimHit.entryPoint()).z());
 			}//end loop over PSimHit for this sim Track.
-			if(j==0) h_hits_1->Fill(matchedHits); 
-			//if(j==0) h_hits_1->Fill(numberOfHits); 
-			if(j==0 && TMath::Abs(tp->eta())<=1) h_hits_3->Fill(matchedHits);
-			if(numberOfHits >4) {
-				for(int i=0; i<int(vx.size());++i){
-					hdist->Fill(vx.at(i), vy.at(i));
-				}
-			}
-			vx.clear();
-			vy.clear();
+			if( j==0 ) h3_hitsDistribution->Fill(numberOfTrackerHits, tp->eta(), tp->phi());
+			if( j==0 ) h3_layerDistribution->Fill(matchedHits, tp->eta(), tp->phi());
 		}
 		//	h_hits_1->Fill(tp->numberOfHits());
-		h_hits_2->Fill(tp->numberOfTrackerHits());
 		hpt ->Fill(tp->pt());
 	}
 	std::cout<<tpCollection->size()<<std::endl;
